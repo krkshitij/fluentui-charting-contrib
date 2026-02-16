@@ -1,0 +1,9 @@
+{
+	"servers": {
+		"my-mcp-server-56afc61d": {
+			"url": "http://localhost:8787/mcp",
+			"type": "http"
+		}
+	},
+	"inputs": []
+}

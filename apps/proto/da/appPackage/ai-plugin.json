@@ -1,0 +1,61 @@
+{
+    "$schema": "https://aka.ms/json-schemas/copilot-extensions/v2.1/plugin.schema.json",
+    "schema_version": "v2.4",
+    "name_for_human": "proto-da",
+    "description_for_human": "proto-da${{APP_NAME_SUFFIX}}",
+    "contact_email": "publisher-email@example.com",
+    "namespace": "protoda",
+    "functions": [
+        {
+            "name": "display_chart",
+            "description": "Displays a chart example with the given ID."
+        }
+    ],
+    "runtimes": [
+        {
+            "type": "RemoteMCPServer",
+            "spec": {
+                "url": "https://1bb8b5345c53.ngrok-free.app/mcp",
+                "x-mcp_tool_description": {
+                    "tools": [
+                        {
+                            "name": "display_chart",
+                            "title": "Display chart",
+                            "description": "Displays a chart example with the given ID.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "number",
+                                        "description": "The ID of the chart example to display."
+                                    }
+                                },
+                                "required": [
+                                    "id"
+                                ],
+                                "additionalProperties": false,
+                                "$schema": "http://json-schema.org/draft-07/schema#"
+                            },
+                            "annotations": {
+                                "readOnlyHint": true,
+                                "destructiveHint": false,
+                                "openWorldHint": false
+                            },
+                            "execution": {
+                                "taskSupport": "forbidden"
+                            },
+                            "_meta": {
+                                "openai/outputTemplate": "ui://widget/chart-v2.html",
+                                "openai/toolInvocation/invoking": "Fetching chart data and plotting chart...",
+                                "openai/toolInvocation/invoked": "Chart displayed"
+                            }
+                        }
+                    ]
+                }
+            },
+            "run_for_functions": [
+                "display_chart"
+            ]
+        }
+    ]
+}
