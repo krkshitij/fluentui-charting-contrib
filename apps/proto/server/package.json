@@ -5,6 +5,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "setup:python": "node python/setup.mjs",
+    "prestart": "node python/setup.mjs",
     "start": "tsx src/index.ts"
   },
   "keywords": [],

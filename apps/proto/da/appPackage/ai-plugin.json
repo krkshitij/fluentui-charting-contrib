@@ -7,37 +7,50 @@
     "namespace": "protoda",
     "functions": [
         {
-            "name": "display_chart",
-            "description": "Displays a chart example with the given ID."
+            "name": "generate_chart",
+            "description": "Generates a chart from a natural language description and returns the chart image and data.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Natural language description of the chart to generate, e.g. 'bar chart of top 5 fruits by sales'"
+                    }
+                },
+                "required": [
+                    "query"
+                ]
+            }
         }
     ],
     "runtimes": [
         {
             "type": "RemoteMCPServer",
             "spec": {
-                "url": "https://1bb8b5345c53.ngrok-free.app/mcp",
+                "url": "https://1847-4-213-232-135.ngrok-free.app/mcp",
+                "enable_dynamic_discovery": false,
                 "x-mcp_tool_description": {
                     "tools": [
                         {
-                            "name": "display_chart",
-                            "title": "Display chart",
-                            "description": "Displays a chart example with the given ID.",
+                            "name": "generate_chart",
+                            "title": "Chart",
+                            "description": "Creates a chart or data visualization from Python code and returns the rendered image and structured data.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "id": {
-                                        "type": "number",
-                                        "description": "The ID of the chart example to display."
+                                    "code": {
+                                        "type": "string",
+                                        "description": "Self-contained Python script using Plotly Express (import plotly.express as px) that prepares data, creates a figure, and saves it as chart.png (fig.write_image('chart.png')) and chart.json (fig.write_json('chart.json')). Never call fig.show()."
                                     }
                                 },
                                 "required": [
-                                    "id"
+                                    "code"
                                 ],
                                 "additionalProperties": false,
                                 "$schema": "http://json-schema.org/draft-07/schema#"
                             },
                             "annotations": {
-                                "readOnlyHint": true,
+                                "readOnlyHint": false,
                                 "destructiveHint": false,
                                 "openWorldHint": false
                             },
@@ -45,16 +58,16 @@
                                 "taskSupport": "forbidden"
                             },
                             "_meta": {
-                                "openai/outputTemplate": "ui://widget/chart-v2.html",
-                                "openai/toolInvocation/invoking": "Fetching chart data and plotting chart...",
-                                "openai/toolInvocation/invoked": "Chart displayed"
+                                "openai/outputTemplate": "ui://widget/chart-plotly.html",
+                                "openai/toolInvocation/invoking": "Generating chart...",
+                                "openai/toolInvocation/invoked": "Chart generated"
                             }
                         }
                     ]
                 }
             },
             "run_for_functions": [
-                "display_chart"
+                "generate_chart"
             ]
         }
     ]
