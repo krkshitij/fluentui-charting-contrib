@@ -1,4 +1,4 @@
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { HumanMessage } from "@langchain/core/messages";
 import { MemorySaver } from "@langchain/langgraph";
 import { createAgent } from "langchain";
 import { AzureChatOpenAI } from "@langchain/openai";
@@ -8,12 +8,14 @@ import {
   MessageFactory,
   TurnContext,
 } from "@microsoft/agents-hosting";
-import { dateTool } from "./tools/dateTimeTool";
+import { dateTool, nowTool } from "./tools/dateTimeTool";
 import { getWeatherTool } from "./tools/getWeatherTool";
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 
 interface WeatherForecastAgentResponse {
-  contentType: "Text" | "AdaptiveCard";
+  contentType: "Text" | "AdaptiveCard" | "Image";
   content: string;
 }
 
@@ -32,7 +34,7 @@ const client = new MultiServerMCPClient({
   mcpServers: {
     proto: {
       transport: "http",
-      url: "https://1bb8b5345c53.ngrok-free.app/mcp",
+      url: "https://1847-4-213-232-135.ngrok-free.app/mcp",
     },
   },
 });
@@ -46,40 +48,51 @@ const agentModel = new AzureChatOpenAI({
 });
 const agentCheckpointer = new MemorySaver();
 
-const sysMessage = new SystemMessage(`
-You are a friendly assistant that helps people find a weather forecast for a given time and place.
-You may ask follow up questions until you have enough information to answer the customers question,
-but once you have a forecast forecast, make sure to format it nicely using an adaptive card.
-
-Respond in JSON format with the following JSON schema, and do not use markdown in the response:
-
-{
-    "contentType": "'Text' or 'AdaptiveCard' only",
-    "content": "{The content of the response, may be plain text, or JSON based adaptive card}"
-}`);
+const systemPrompt = readFileSync(
+  resolve(__dirname, "prompts", "systemPrompt.md"),
+  "utf-8",
+);
 
 const main = async () => {
-  const agentTools = [getWeatherTool, dateTool, ...(await client.getTools())];
+  const agentTools = [
+    getWeatherTool,
+    dateTool,
+    nowTool,
+    ...(await client.getTools()),
+  ];
   const agent = createAgent({
     model: agentModel,
     tools: agentTools,
     checkpointer: agentCheckpointer,
+    systemPrompt,
   });
 
   weatherAgent.onActivity(ActivityTypes.Message, async (context, state) => {
+    const threadId = context.activity.conversation!.id;
+    const userMessage = context.activity.text!;
+    console.log(`[${threadId}] User: ${userMessage}`);
+
+    const startTime = Date.now();
     const llmResponse = await agent.invoke(
-      {
-        messages: [sysMessage, new HumanMessage(context.activity.text!)],
-      } as any,
-      {
-        configurable: { thread_id: context.activity.conversation!.id },
-      },
+      { messages: [new HumanMessage(userMessage)] } as any,
+      { configurable: { thread_id: threadId } },
     );
+    const duration = Date.now() - startTime;
 
-    // console.log(llmResponse.messages);
+    const toolMessages = llmResponse.messages.filter(
+      (m: any) => m._getType?.() === "tool",
+    );
+    if (toolMessages.length > 0) {
+      const toolNames = toolMessages.map((m: any) => m.name).join(", ");
+      console.log(`[${threadId}] Tools called: ${toolNames}`);
+    }
 
+    const lastMessage = llmResponse.messages[llmResponse.messages.length - 1];
     const llmResponseContent: WeatherForecastAgentResponse = JSON.parse(
-      llmResponse.messages[llmResponse.messages.length - 1].content as string,
+      lastMessage.content as string,
+    );
+    console.log(
+      `[${threadId}] Response: ${llmResponseContent.contentType} (${duration}ms)`,
     );
 
     if (llmResponseContent.contentType === "Text") {
@@ -90,6 +103,41 @@ const main = async () => {
         content: llmResponseContent.content,
       });
       await context.sendActivity(response);
+    } else if (llmResponseContent.contentType === "Image") {
+      // The LLM cannot reproduce large base64 strings, so extract
+      // the actual image data URI from tool message content blocks.
+      let imageUrl = "";
+      for (const msg of toolMessages) {
+        const content = (msg as any).content;
+        if (Array.isArray(content)) {
+          const imageBlock = content.find(
+            (block: any) => block.type === "image_url",
+          );
+          if (imageBlock) {
+            imageUrl = imageBlock.image_url?.url ?? "";
+            break;
+          }
+        }
+      }
+
+      if (imageUrl) {
+        const response = MessageFactory.attachment({
+          contentType: "application/vnd.microsoft.card.adaptive",
+          content: {
+            type: "AdaptiveCard",
+            $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+            version: "1.5",
+            body: [
+              {
+                type: "Image",
+                url: imageUrl,
+                size: "stretch",
+              },
+            ],
+          },
+        });
+        await context.sendActivity(response);
+      }
     }
   });
 };
