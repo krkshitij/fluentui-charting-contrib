@@ -13,6 +13,7 @@ import { getWeatherTool } from "./tools/getWeatherTool";
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { storeChart } from "./chartStore";
 
 interface WeatherForecastAgentResponse {
   contentType: "Text" | "AdaptiveCard" | "Image";
@@ -104,9 +105,12 @@ const main = async () => {
       });
       await context.sendActivity(response);
     } else if (llmResponseContent.contentType === "Image") {
-      // The LLM cannot reproduce large base64 strings, so extract
-      // the actual image data URI from tool message content blocks.
+      // Extract image and Plotly schema from tool messages.
+      // The LLM can't reproduce large base64 strings, so we pull
+      // image data and chart schema directly from tool results.
       let imageUrl = "";
+      let plotlySchema: any = null;
+
       for (const msg of toolMessages) {
         const content = (msg as any).content;
         if (Array.isArray(content)) {
@@ -115,25 +119,54 @@ const main = async () => {
           );
           if (imageBlock) {
             imageUrl = imageBlock.image_url?.url ?? "";
-            break;
           }
         }
+        const artifact = (msg as any).artifact;
+        if (Array.isArray(artifact)) {
+          const meta = artifact.find(
+            (a: any) => a.type === "mcp_meta" && a.data?.plotlySchema,
+          );
+          if (meta) {
+            plotlySchema = meta.data.plotlySchema;
+          }
+        }
+        if (imageUrl && plotlySchema) break;
       }
 
+      // Build the Adaptive Card body
+      const cardBody: any[] = [];
       if (imageUrl) {
+        cardBody.push({ type: "Image", url: imageUrl, size: "stretch" });
+      }
+
+      // If we have a Plotly schema, store it and add a task module button
+      const cardActions: any[] = [];
+      if (plotlySchema) {
+        const chartId = storeChart(plotlySchema);
+        const botDomain = process.env.BOT_DOMAIN ?? "";
+        const appId = process.env.TEAMS_APP_ID ?? "";
+        const chartUrl = `https://${botDomain}/chart.html?id=${chartId}`;
+        const taskModuleUrl =
+          `https://teams.microsoft.com/l/task/${appId}` +
+          `?url=${encodeURIComponent(chartUrl)}` +
+          `&height=large&width=large` +
+          `&title=${encodeURIComponent("Interactive Chart")}`;
+        cardActions.push({
+          type: "Action.OpenUrl",
+          title: "View Interactive Chart",
+          url: taskModuleUrl,
+        });
+      }
+
+      if (cardBody.length > 0 || cardActions.length > 0) {
         const response = MessageFactory.attachment({
           contentType: "application/vnd.microsoft.card.adaptive",
           content: {
             type: "AdaptiveCard",
             $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
             version: "1.5",
-            body: [
-              {
-                type: "Image",
-                url: imageUrl,
-                size: "stretch",
-              },
-            ],
+            body: cardBody,
+            actions: cardActions,
           },
         });
         await context.sendActivity(response);
