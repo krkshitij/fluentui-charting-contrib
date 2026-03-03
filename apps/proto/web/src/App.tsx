@@ -3,12 +3,10 @@ import { useMemo } from "react";
 // import viteLogo from '/vite.svg'
 // import './App.css'
 import { DeclarativeChart, type Schema } from "@fluentui/react-charts";
-import { useOpenAiGlobal } from "./use-openai-global";
+import { useMcpToolResult } from "./use-mcp-app";
 
 function App() {
-  const toolResponseMetadata = useOpenAiGlobal(
-    "toolResponseMetadata",
-  ) as Record<string, unknown> | null;
+  const { toolResponseMetadata } = useMcpToolResult();
 
   const inputSchema: Schema = useMemo(
     () => ({

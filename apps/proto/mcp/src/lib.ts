@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+export const ASSETS_DIR = path.resolve(__dirname, "..", "public");
+
 export const PYTHON_DIR = path.resolve(__dirname, "..", "python");
 
 const isWindows = process.platform === "win32";
@@ -28,6 +30,30 @@ export const SYSTEM_PROMPT = readFileSync(
 );
 
 const execFileAsync = promisify(execFile);
+
+export function createLogger(tag: string) {
+  const start = Date.now();
+  return (msg: string) =>
+    console.log(
+      `[${tag}] ${msg} (${((Date.now() - start) / 1000).toFixed(1)}s)`,
+    );
+}
+
+export function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+const CHART_EXAMPLE_BASE_URL =
+  "https://raw.githubusercontent.com/microsoft/fluentui-charting-contrib/refs/heads/main/apps/plotly_examples/src/data";
+
+export async function fetchChartExample(id: number): Promise<unknown> {
+  const filename = `data_${String(id).padStart(3, "0")}`;
+  const response = await fetch(`${CHART_EXAMPLE_BASE_URL}/${filename}.json`);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+}
 
 export interface ChartResult {
   chartPng: Buffer;

@@ -2,56 +2,13 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import path, { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { readFileSync } from "node:fs";
-import { registerDisplayChartTool } from "./tools/display-chart.js";
 import { registerGenerateChartToolV2 } from "./tools/generate-chart-v2.js";
-import { PLOTLY_TEMPLATE_URI } from "./lib.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const ASSETS_DIR = path.resolve(__dirname, "..", "public");
-
-// const VEGA_TEMPLATE_URI = "ui://widget/chart-vega.html";
-const MIME_TYPE = "text/html+skybridge";
+import { registerChartPlotlyResourceOai } from "./resources/chart-plotly-oai.js";
 
 function createMcpServer() {
-  const server = new McpServer({ name: "chart-app", version: "1.0.0" });
+  const server = new McpServer({ name: "chart-generator", version: "1.0.0" });
 
-  server.registerResource(
-    "chart-plotly",
-    PLOTLY_TEMPLATE_URI,
-    {},
-    async () => ({
-      contents: [
-        {
-          uri: PLOTLY_TEMPLATE_URI,
-          text: readFileSync(
-            path.join(ASSETS_DIR, "chart-plotly.html"),
-            "utf8",
-          ),
-          mimeType: MIME_TYPE,
-          _meta: {
-            "openai/widgetPrefersBorder": true,
-          },
-        },
-      ],
-    }),
-  );
-
-  // server.registerResource("chart-vega", VEGA_TEMPLATE_URI, {}, async () => ({
-  //   contents: [
-  //     {
-  //       uri: VEGA_TEMPLATE_URI,
-  //       text: readFileSync(path.join(ASSETS_DIR, "chart-vega.html"), "utf8"),
-  //       mimeType: MIME_TYPE,
-  //       _meta: {
-  //         "openai/widgetPrefersBorder": true,
-  //       },
-  //     },
-  //   ],
-  // }));
-
+  registerChartPlotlyResourceOai(server);
   registerGenerateChartToolV2(server);
 
   return server;
@@ -59,6 +16,7 @@ function createMcpServer() {
 
 const port = Number(process.env.PORT ?? 8787);
 const MCP_PATH = "/mcp";
+const MCP_METHODS = new Set(["POST", "GET", "DELETE"]);
 
 const sessions = new Map<
   string,
@@ -89,7 +47,6 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
 
-  const MCP_METHODS = new Set(["POST", "GET", "DELETE"]);
   if (url.pathname === MCP_PATH && req.method && MCP_METHODS.has(req.method)) {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");

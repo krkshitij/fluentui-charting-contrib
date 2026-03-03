@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { PLOTLY_TEMPLATE_URI } from "../lib.js";
+import { PLOTLY_TEMPLATE_URI, fetchChartExample, getErrorMessage } from "../lib.js";
 
 export function registerDisplayChartTool(server: McpServer) {
   server.registerTool(
@@ -25,10 +25,7 @@ export function registerDisplayChartTool(server: McpServer) {
     },
     async ({ id }) => {
       try {
-        const filename = `data_${id < 100 ? ("00" + id).slice(-3) : id}`;
-        const plotlySchema = await fetch(
-          `https://raw.githubusercontent.com/microsoft/fluentui-charting-contrib/refs/heads/main/apps/plotly_examples/src/data/${filename}.json`,
-        ).then((response) => response.json());
+        const plotlySchema = await fetchChartExample(id);
 
         return {
           structuredContent: { id },
@@ -38,12 +35,13 @@ export function registerDisplayChartTool(server: McpServer) {
           _meta: { plotlySchema },
         };
       } catch (error) {
+        const message = getErrorMessage(error);
         return {
           structuredContent: { id },
           content: [
             {
               type: "text",
-              text: `Failed to load chart data for example ID: ${id}`,
+              text: `Failed to load chart data for example ID: ${id}: ${message}`,
             },
           ],
         };

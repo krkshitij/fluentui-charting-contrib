@@ -3,9 +3,10 @@ import { z } from "zod";
 import {
   PLOTLY_TEMPLATE_URI,
   SYSTEM_PROMPT,
+  createLogger,
+  getErrorMessage,
   runPythonChart,
 } from "../lib.js";
-
 export function registerGenerateChartToolV2(server: McpServer) {
   server.registerPrompt(
     "plotly-express",
@@ -49,11 +50,7 @@ export function registerGenerateChartToolV2(server: McpServer) {
       },
     },
     async ({ code }) => {
-      const start = Date.now();
-      const log = (msg: string) =>
-        console.log(
-          `[generate_chart] ${msg} (${((Date.now() - start) / 1000).toFixed(1)}s)`,
-        );
+      const log = createLogger("generate_chart");
 
       log(`Starting — code length: ${code.length} chars`);
 
@@ -72,8 +69,8 @@ export function registerGenerateChartToolV2(server: McpServer) {
           _meta: { plotlySchema: chartJson },
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(`[generate_chart] Failed: ${message}`);
+        const message = getErrorMessage(error);
+        log(`Failed: ${message}`);
         return {
           content: [
             {
